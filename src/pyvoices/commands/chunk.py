@@ -32,7 +32,7 @@ def run(args):
         transcription = list(t.values())[0]
         concept = t[args.concept_column]
         if not concept:
-            continue
+            continue  # pragma: no cover
         if concept in intervalByConcept:
             # We can match a transcription to a lable in the Praat file, ...
             interval = intervalByConcept[concept]
