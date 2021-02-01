@@ -29,6 +29,8 @@ setup(
         'clldutils>=3.6.0',
         'pycldf>=1.8.2',
         'openpyxl',
+        'pydub',
+        'praatio',
     ],
     extras_require={
         'dev': ['flake8', 'wheel', 'twine'],
