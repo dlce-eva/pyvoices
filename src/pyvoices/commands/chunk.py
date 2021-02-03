@@ -7,6 +7,9 @@ from clldutils.clilib import PathType
 
 from pyvoices.doculect import Doculect
 
+# FIXME: Also spit out a CLDF Wordlist? an EDICTOR Wordlist?
+#ID>-----ALIGNMENT>------CLASSES>COGID>--COGIDS>-COGNACY>CONCEPT>DOCULECT>-------DUPLICATES>-----FORM>---IPA>----LANGID>-LANGUAGE_NAME>--MORPHEMES>------NUMBERS>PROSTRINGS>-----SONARS>-TOKENS>-VALUE>--WEIGHTS>NOTE
+#1>------n a ʔ o t>------NAHUT>--3>------4>------emcimade>-------ABOVE>--Karo_Arara>-----0>------naʔot>--naʔot>--36>-----Karo (Arara)>---ABOVE>--36.N.C 36.A.V 36.H.C 36.U.V 36.T.c>-----AXBYN>--4 7 1 7 1>------n a ʔ o t>------naʔot>--2.0 1.5 1.75 1.3 0.8>---
 
 def register(parser):
     parser.add_argument('input', type=PathType(type='dir'))
@@ -26,6 +29,7 @@ def run(args):
     if not chunkdir.exists():
         chunkdir.mkdir()
 
+    audio = get_mono_channel(d.audio)  # FIXME: pass in channel number from args!
     intervalByConcept = {i.label: i for i in d.praat_textgrid.tierDict[args.concept_tier].entryList}
     count = 0
     for t in d.iter_transcriptions():
@@ -37,10 +41,10 @@ def run(args):
             # We can match a transcription to a lable in the Praat file, ...
             interval = intervalByConcept[concept]
             # .. so we can cut out the corresponding audio chunk ...
-            audio_chunk = d.audio[interval.start * 1000:interval.end * 1000]
+            audio_chunk = audio[interval.start * 1000 - 30:interval.end * 1000 + 30]
             # ... make it smooth around the edges ...
-            audio_chunk.fade_in(5)
-            audio_chunk.fade_out(5)
+            audio_chunk.fade_in(30)
+            audio_chunk.fade_out(30)
             # ... and make the amplitude match that of the whole audio file:
             audio_chunk.apply_gain(d.audio.dBFS - audio_chunk.dBFS)
             md = {
@@ -55,7 +59,17 @@ def run(args):
             count += 1
         else:
             args.log.warning('no interval for concept: "{}"'.format(concept))
+    #
+    # FIXME: do we have to write the filenames to the xslx?
+    #
     args.log.info('created soundfiles for {} concepts in {}'.format(count, chunkdir))
+
+
+def get_mono_channel(audio, channel=1):
+    assert 0 < channel <= audio.channels
+    if audio.channels > 1:
+        return audio.split_to_mono()[channel - 1]
+    return audio
 
 
 def save(d, interval, chunk, tags, format, **kw):

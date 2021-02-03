@@ -12,5 +12,5 @@ def test_chunk(doculect_dir, mocker):
     res = doculect_dir.joinpath('chunks', 'new_moon.mp3')
     if 'CI' not in os.environ:
         assert res.exists()
-        assert pydub.utils.mediainfo(res)['TAG']['album'] == 'doculect'
+        assert pydub.utils.mediainfo(res)['TAG']['album'] == 'audio'
 

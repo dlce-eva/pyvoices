@@ -31,6 +31,7 @@ setup(
         'openpyxl',
         'pydub',
         'praatio',
+        'pympi-ling',
     ],
     extras_require={
         'dev': ['flake8', 'wheel', 'twine'],
