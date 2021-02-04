@@ -50,14 +50,14 @@ class Doculect:
             eaf.to_textgrid().to_file(str(p))
         return praatio.tgio.openTextgrid(p)
 
-    def iter_transcriptions(self, concept_tier='English'):
+    def iter_transcriptions(self, concept_tier='Rfc-Form', concept_column='English Translation'):
         try:
             p = self._path('xlsx')
         except ValueError:
             # No xlsx transcriptions file: seed one with the concept labels from praat:
             p = self.dir / '{}.xlsx'.format(self.id)
             wb = openpyxl.Workbook()
-            wb.active.append([self.id, concept_tier])
+            wb.active.append([self.id, concept_column])
             seen = set()
             for t in self.praat_textgrid.tierDict[concept_tier].entryList:
                 if t.label and t.label not in seen:
