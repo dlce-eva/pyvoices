@@ -32,7 +32,7 @@ def run(args):
     audio = get_mono_channel(d.audio)  # FIXME: pass in channel number from args!
     intervalByConcept = {i.label: i for i in d.praat_textgrid.tierDict[args.concept_tier].entryList}
     count = 0
-    for t in d.iter_transcriptions():
+    for t in d.iter_transcriptions(concept_tier=args.concept_tier, concept_column=args.concept_column):
         transcription = list(t.values())[0]
         concept = t[args.concept_column]
         if not concept:
