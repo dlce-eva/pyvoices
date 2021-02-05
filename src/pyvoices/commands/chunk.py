@@ -2,6 +2,7 @@
 
 """
 import datetime
+from pydub.effects import normalize
 
 from clldutils.clilib import PathType
 
@@ -10,6 +11,7 @@ from pyvoices.doculect import Doculect
 # FIXME: Also spit out a CLDF Wordlist? an EDICTOR Wordlist?
 #ID>-----ALIGNMENT>------CLASSES>COGID>--COGIDS>-COGNACY>CONCEPT>DOCULECT>-------DUPLICATES>-----FORM>---IPA>----LANGID>-LANGUAGE_NAME>--MORPHEMES>------NUMBERS>PROSTRINGS>-----SONARS>-TOKENS>-VALUE>--WEIGHTS>NOTE
 #1>------n a ʔ o t>------NAHUT>--3>------4>------emcimade>-------ABOVE>--Karo_Arara>-----0>------naʔot>--naʔot>--36>-----Karo (Arara)>---ABOVE>--36.N.C 36.A.V 36.H.C 36.U.V 36.T.c>-----AXBYN>--4 7 1 7 1>------n a ʔ o t>------naʔot>--2.0 1.5 1.75 1.3 0.8>---
+
 
 def register(parser):
     parser.add_argument('input', type=PathType(type='dir'))
@@ -40,13 +42,12 @@ def run(args):
         if concept in intervalByConcept:
             # We can match a transcription to a lable in the Praat file, ...
             interval = intervalByConcept[concept]
-            # .. so we can cut out the corresponding audio chunk ...
-            audio_chunk = audio[interval.start * 1000 - 30:interval.end * 1000 + 30]
-            # ... make it smooth around the edges ...
-            audio_chunk.fade_in(30)
-            audio_chunk.fade_out(30)
-            # ... and make the amplitude match that of the whole audio file:
-            audio_chunk.apply_gain(d.audio.dBFS - audio_chunk.dBFS)
+            # ... so we can cut out the corresponding audio chunk
+            # and normalize it (headroom 4db) and fade inand out ...
+            audio_chunk = normalize(
+                audio[interval.start * 1000 - 50:interval.end * 1000 + 50], 4.)\
+                .fade_in(duration=50)\
+                .fade_out(duration=50)
             md = {
                 'artist': 'Vanuatu Voices',
                 'title': '{}: {}'.format(interval.label, transcription),
