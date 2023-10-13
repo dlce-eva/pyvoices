@@ -8,7 +8,7 @@ import collections
 
 import pydub
 import pympi
-import praatio.tgio
+import praatio.textgrid
 import openpyxl
 from clldutils.misc import lazyproperty
 
@@ -22,17 +22,27 @@ def case_insensitive_glob_pattern(pattern):
 class Doculect:
     def __init__(self, d):
         self.dir = pathlib.Path(d)
+        self._eaf_tier_name = None
+        self._eaf_tier_names = []
 
     def _path(self, ext):
         p = '*.' + case_insensitive_glob_pattern(ext)
         try:
-            return list(self.dir.glob(p))[0]
-        except:
+            return [p for p in list(self.dir.glob(p)) if not p.name.startswith('~$')][0]
+        except:  # pragma: no cover
             raise ValueError(p)
 
     @property
     def id(self):
         return self._path('wav').stem
+
+    @property
+    def eaf_tier_name(self):
+        return self._eaf_tier_name
+
+    @property
+    def eaf_tier_names(self):
+        return self._eaf_tier_names
 
     @lazyproperty
     def audio(self):
@@ -46,9 +56,15 @@ class Doculect:
             # Need to convert eaf to TextGrid
             assert self._path('eaf')
             eaf = pympi.Eaf(str(self._path('eaf')))
+            tier_names = list(eaf.get_tier_names())
+            # If only one tier is found take this otherwise print out all available to rerun it
+            if len(tier_names) == 1:
+                self._eaf_tier_name = tier_names[0]
+            else:
+                self._eaf_tier_names = tier_names
             p = self.dir / '{}.TextGrid'.format(self.id)
             eaf.to_textgrid().to_file(str(p))
-        return praatio.tgio.openTextgrid(p)
+        return praatio.textgrid.openTextgrid(p, includeEmptyIntervals=False)
 
     def iter_transcriptions(self, concept_tier='Rfc-Form', concept_column='English Translation'):
         try:
