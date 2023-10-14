@@ -7,7 +7,6 @@ The rationale behind this is that while a lot of different tasks may be
 triggered using this cli, most of them require common configuration.
 """
 import sys
-import argparse
 import contextlib
 
 from clldutils.clilib import ParserError, get_parser_and_subparsers, register_subcommands

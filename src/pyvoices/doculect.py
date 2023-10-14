@@ -29,7 +29,7 @@ class Doculect:
         p = '*.' + case_insensitive_glob_pattern(ext)
         try:
             return [p for p in list(self.dir.glob(p)) if not p.name.startswith('~$')][0]
-        except:  # pragma: no cover
+        except Exception:  # pragma: no cover
             raise ValueError(p)
 
     @property
