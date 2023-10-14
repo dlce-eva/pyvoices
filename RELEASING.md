@@ -14,8 +14,8 @@ flake8 src
 ```
 
 - Update the version number, by removing the trailing `.dev0` in:
-  - `setup.py`
-  - `src/cldfbench/__init__.py`
+  - `setup.cfg`
+  - `src/pyvoices/__init__.py`
 
 - Create the release commit:
 ```shell
