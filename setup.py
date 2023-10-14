@@ -22,7 +22,7 @@ setup(
         ],
     },
     platforms='any',
-    python_requires='>=3.6',
+    python_requires='>=3.8',
     install_requires=[
         'csvw>=3.1.3',
         'cldfcatalog>=1.5.1',
@@ -52,6 +52,7 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python :: Implementation :: PyPy'
     ],
