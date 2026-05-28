@@ -1,8 +1,17 @@
 """
+The chunk command expects
+- a wav file of an elicitation session
+- the corresponding ELAN file with form chunks marked with concept labels in a tier
+- transcriptions for the concept labels in an EXCEL sheet
 
+Running `voices chunk` on a directory containing these files results in creation of
+- a TextGrid file, containing the data of the selected ELAN tier
+- a directory `chunks` containing audio files named using the concept labels
 """
-import collections
+import pathlib
 import datetime
+
+from pydub import AudioSegment
 from pydub.effects import normalize
 from praatio.utilities.constants import Interval
 
@@ -19,8 +28,6 @@ NORMALIZE_HEADROOM = 4.
 INTERVAL_OFFSET = 50
 # fade in/out time in milliseconds
 FADE_TIME = 50
-
-exported_chunks = dict()
 
 # FIXME: Also spit out a CLDF Wordlist? an EDICTOR Wordlist?
 # ID>-----ALIGNMENT>------CLASSES>COGID>--COGIDS>-COGNACY>CONCEPT>DOCULECT>-------DUPLICATES
@@ -61,20 +68,19 @@ def run(args):
     textgrid = d.praat_textgrid
 
     if d.eaf_tier_name is not None:
-        args.log.info('TextGrid file was created, this tier name will be used: {}'.format(
-                      d._eaf_tier_name))
+        args.log.info(
+            'TextGrid file was created, this tier name will be used: %s',
+            d._eaf_tier_name)  # pylint: disable=W0212
         concept_tier = d.eaf_tier_name
-    elif args.concept_tier in d.eaf_tier_names or args.concept_tier in textgrid._tierDict:
+    elif any((
+            args.concept_tier in d.eaf_tier_names,
+            args.concept_tier in textgrid._tierDict)):  # pylint: disable=W0212
         concept_tier = args.concept_tier
     else:
-        args.log.info('TextGrid file was created, these tier names were found:\n{}'.format(
-                      ', '.join(d._eaf_tier_names)))
+        args.log.info(
+            'TextGrid file was created, these tier names were found:\n%s',
+            ', '.join(d._eaf_tier_names))  # pylint: disable=W0212
         return
-
-    intervalByConcept = collections.defaultdict(list)
-
-    for i in textgrid._tierDict[concept_tier].entries:
-        intervalByConcept[i.label.strip()].append(i)
 
     is_mapped = False
     if args.concept_map_column is None:
@@ -83,12 +89,10 @@ def run(args):
         is_mapped = True
         concept_column = args.concept_map_column
 
+    intervals = d.intervals(concept_tier)
     audio = get_mono_channel(d.audio)  # FIXME: pass in channel number faderom args!
-
     count = 0
     for t in d.iter_transcriptions(concept_tier=concept_tier, concept_column=concept_column):
-
-        transcription = list(t.values())[0].strip()
         if is_mapped:
             concept = t[args.concept_map_column].strip()
         else:
@@ -96,66 +100,62 @@ def run(args):
         if not concept:
             continue  # pragma: no cover
 
-        if concept in intervalByConcept:
+        if concept not in intervals.by_concept:
+            args.log.warning('no interval for concept: "%s"', concept)
+            continue
 
-            if concept in exported_chunks:
-                exported_chunks[concept] += 1
-                idx = '___{}'.format(exported_chunks[concept])
-                args.log.info('duplicates for {}'.format(concept))
-            else:
-                exported_chunks[concept] = 1
-                idx = ''
-            cpt_idx = exported_chunks[concept] - 1
+        interval, idx = intervals.get(concept, t[args.concept_column].strip())
+        if interval is None:
+            args.log.error('check occurrences of concept %s', concept)
+            return
 
-            # We can match a transcription to a label in the Praat file, ...
-            try:
-                interval = intervalByConcept[concept][cpt_idx]
-            except IndexError:
-                args.log.error('check occurrences of concept {}'.format(concept))
-                return
-            if is_mapped:
-                interval = Interval(interval.start, interval.end, t[args.concept_column].strip())
-            # ... so we can cut out the corresponding audio chunk
-            audio_chunk = audio[
-                interval.start * 1000 - INTERVAL_OFFSET:interval.end * 1000 + INTERVAL_OFFSET]
-            if NORMALIZE:
-                # normalize it with headroom
-                audio_chunk = normalize(audio_chunk, NORMALIZE_HEADROOM)
-            # fade in and out
-            audio_chunk = audio_chunk.fade_in(duration=FADE_TIME).fade_out(duration=FADE_TIME)
-            md = {
+        # ... so we can cut out the corresponding audio chunk
+        chunk(
+            audio,
+            interval,
+            chunkdir,
+            idx,
+            {
                 'artist': args.album,
-                'title': '{}{}: {}'.format(interval.label, idx, transcription),
                 'album': d.id,
-                'date': datetime.date.today().isoformat(),
-                'genre': 'Speech'}
-            save(chunkdir, interval, idx, audio_chunk, md, 'wav', codec="copy")
-            save(chunkdir, interval, idx, audio_chunk, md, 'mp3', bitrate="128k")
-            save(chunkdir, interval, idx, audio_chunk, md, 'ogg', bitrate="128k")
-            count += 1
-        else:
-            args.log.warning('no interval for concept: "{}"'.format(concept))
+                'title': f'{interval.label}{idx}: {list(t.values())[0].strip()}'})
+        count += 1
+
     #
     # FIXME: do we have to write the filenames to the xslx?
     #
-    args.log.info('created soundfiles for {} concepts in {} of {} TextGrid intervals'.format(
-                  count, chunkdir, len(textgrid._tierDict[concept_tier].entries)))
-
-    for c in intervalByConcept:
-        if c in exported_chunks:
-            if len(intervalByConcept[c]) != exported_chunks[c]:
-                args.log.warning('check occurrances of {} in TextGrid and XLSX'.format(c))
-        else:
-            args.log.info('found {} in TextGrid but not in XLSX'.format(c))
+    args.log.info(
+        'created soundfiles for %s concepts in %s of %s TextGrid intervals',
+        count, chunkdir, len(textgrid._tierDict[concept_tier].entries))  # pylint: disable=W0212
+    intervals.info(args.log)
 
 
-def get_mono_channel(audio, channel=1):
+def chunk(
+        audio: AudioSegment,
+        interval: Interval,
+        chunkdir: pathlib.Path,
+        idx: str,
+        md_: dict[str, str],
+):
+    """Chunk the audio and write chunks in three formats to disk."""
+    audio_chunk = audio[
+        interval.start * 1000 - INTERVAL_OFFSET:interval.end * 1000 + INTERVAL_OFFSET]
+    if NORMALIZE:
+        # normalize it with headroom
+        audio_chunk = normalize(audio_chunk, NORMALIZE_HEADROOM)
+    # fade in and out
+    audio_chunk = audio_chunk.fade_in(duration=FADE_TIME).fade_out(duration=FADE_TIME)
+    md = {'date': datetime.date.today().isoformat(), 'genre': 'Speech'}
+    md.update(md_)
+    for fmt, kw in [
+            ('wav', {'codec': "copy"}), ('mp3', {'bitrate': "128k"}), ('ogg', {'bitrate': "128k"})]:
+        fn = interval.label.strip().replace('/', '_or_')
+        audio_chunk.export(str(chunkdir / f'{fn}{idx}.{fmt}'), tags=md, format=fmt, **kw)
+
+
+def get_mono_channel(audio: AudioSegment, channel: int = 1) -> AudioSegment:
+    """Split to mono."""
     assert 0 < channel <= audio.channels
     if audio.channels > 1:
         return audio.split_to_mono()[channel - 1]
     return audio
-
-
-def save(d, interval, idx, chunk, tags, format, **kw):
-    fn = interval.label.strip().replace('/', '_or_')
-    chunk.export(str(d / '{}{}.{}'.format(fn, idx, format)), tags=tags, format=format, **kw)

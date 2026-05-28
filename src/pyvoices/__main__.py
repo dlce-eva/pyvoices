@@ -16,6 +16,7 @@ import pyvoices.commands
 
 
 def main(args=None, catch_all=False, parsed_args=None, log=None):
+    """Main cli function."""
     parser, subparsers = get_parser_and_subparsers('voices')
     register_subcommands(subparsers, pyvoices.commands)
 
@@ -36,7 +37,7 @@ def main(args=None, catch_all=False, parsed_args=None, log=None):
             return 0
         except ParserError as e:
             print(e)
-            return main([args._command, '-h'])
+            return main([args._command, '-h'])  # pylint: disable=W0212
         except Exception as e:
             if catch_all:  # pragma: no cover
                 print(e)

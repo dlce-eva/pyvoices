@@ -42,8 +42,8 @@ git push --tags
 
 - Change version for the next release cycle, i.e. incrementing and adding .dev0
 
-  - `setup.py`
-  - `src/cldfbench/__init__.py`
+  - `setup.cfg`
+  - `src/pyvoices/__init__.py`
 
 - Commit/push the version change:
 ```shell
